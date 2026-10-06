@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: secnotes-ingress
+  namespace: app-note
+  annotations:
+    # Vincula la IP global estática que reservamos en GCP
+    kubernetes.io/ingress.global-static-ip-name: "secnotes-static-ip"
+    # Usa el controlador de Ingress oficial de Google Cloud
+    kubernetes.io/ingress.class: "gce"
+spec:
+  rules:
+  - http:
+      paths:
+      # Enrutar el resto del tráfico web al Frontend
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
