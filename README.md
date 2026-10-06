@@ -125,6 +125,100 @@ EXPOSE 80
 #Iniciar Nginx en primer plano
 CMD ["nginx", "-g", "daemon off;"]
 
+```
 
+---
+## Conectar GitHub a GKE (CI/CD)
 
+En vez de generar llaves privadas en archivos JSON, configuraremos una relación de confianza directa.
+- Google Cloud confiará en el emisor de tokens OIDC de GitHub (***token.actions.githubusercontent.com***)
+- Google Cloud verificará que las peticiones vengan únicamente del repositorio específico (***char-a-cpu/secnotes-lab***)
+- GitHub Actions asumirá una cuenta de servicio de GCP con permisos mínimos necesarios (***Artifact Registry/GKE***) de forma temporal.
+
+**Paso 1: Definir variables de entorno**
+```
+export PROJECT_ID=$(gcloud config get-value project)
+export PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+export REPO="char-a-cpu/secnotes-lab"
+export WORKLOAD_POOL="github-pool"
+export WORKLOAD_PROVIDER="github-provider"
+export SA_NAME="github-actions-sa"
+```
+
+**Paso 2: APIs necesarias**
+```
+gcloud services enable \
+    iam.googleapis.com \
+    cloudresourcemanager.googleapis.com \
+    iamcredentials.googleapis.com \
+    artifactregistry.googleapis.com \
+    container.googleapis.com
+```
+**Paso 3: Crear el Workload Identity Pool**
+
+- Es un contenedor para gestionar identidades externas
+```
+gcloud iam workload-identity-pools create $WORKLOAD_POOL \
+    --project=$PROJECT_ID \
+    --location="global" \
+    --display-name="GitHub Actions Pool"
+```
+**Paso 4: Crear el Workload Identity Provider dentro del Pool**
+
+- Se define que confiamos en GitHub Actions y mapeamos sus atributos(quién ejecuta la acción y desde qué repositorio)
+- El parámetro *--atribute-condition* asgura que solamente el repo *char-a-cpu/secnotes-lab* pueda solicitar acceso a la cuenta de Google Cloud
+```
+gcloud iam workload-identity-pools providers create-oidc $WORKLOAD_PROVIDER \
+    --project=$PROJECT_ID \
+    --location="global" \
+    --workload-identity-pool=$WORKLOAD_POOL \
+    --display-name="GitHub Actions Provider" \
+    --issuer-uri="https://token.actions.githubusercontent.com" \
+    --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository" \
+    --attribute-condition="assertion.repository == '$REPO'"
+```
+**Paso 5: Crear Service Account**
+
+- Representa la identidad que asumirá GitHub para trabajar dentro de la nube.
+
+```
+gcloud iam service-accounts create $SA_NAME \
+    --project=$PROJECT_ID \
+    --display-name="GitHub Actions CI/CD SA"
+```
+**Paso 6: Asignar roles mínimos a la SA (RBAC)**
+
+- Permisos solamente para subir imagenes al Registry y desplegar en GKE
+
+```
+#Permiso para escribir imágenes Docker en Artifact Registry
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
+    --role="roles/artifactregistry.writer"
+
+# Permiso para interactuar con los recursos de Kubernetes en GKE
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
+    --role="roles/container.developer"
+```
+**Paso 7: Vincular la SA con el Workload Identity Pool**
+
+- Permite que tokens provenientes del repositorio asuman la SA creada en GCP
+```
+gcloud iam service-accounts add-iam-policy-binding \
+    "${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
+    --project=$PROJECT_ID \
+    --role="roles/iam.workloadIdentityUser" \
+    --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${WORKLOAD_POOL}/attribute.repository/${REPO}"
+```
+**Paso 8: Obtener los valores necesarios para GitHub**
+```
+# 1. El nombre completo del Workload Identity Provider
+echo "WORKLOAD_IDENTITY_PROVIDER:"
+echo "projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${WORKLOAD_POOL}/providers/${WORKLOAD_PROVIDER}"
+
+# 2. El correo de la Service Account
+echo ""
+echo "SERVICE_ACCOUNT_EMAIL:"
+echo "${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 ```
