@@ -114,13 +114,16 @@ jobs:
 
       # 6. Actualizar las imágenes de los Deployments en Kubernetes
       - name: Actualizar despliegue en Kubernetes
+        env:
+          NAMESPACE: app-note #Namespace definido en GKE
         run: |
+          # Definir los tags completos hacia el Artifact Registry
           BACKEND_TAG="${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO_NAME }}/secnotes-backend:${{ github.sha }}"
           FRONTEND_TAG="${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO_NAME }}/secnotes-frontend:${{ github.sha }}"
-
-          kubectl set image deployment/backend-deployment backend=backend-deployment
-          kubectl set image deployment/frontend-deployment frontend=frontend-deployment
+          # Actualizar el deployment indicando el contenedor y la imagen en un namespace
+          kubectl set image deployment/backend-deployment backend=$BACKEND_TAG -n $NAMESPACE
+          kubectl set image deployment/frontend-deployment frontend=$FRONTEND_TAG -n $NAMESPACE
 
           # Confirmar que la actualización gradual (rolling update) finalizó sin caídas
-          kubectl rollout status deployment/backend-deployment
-          kubectl rollout status deployment/frontend-deployment
+          kubectl rollout status deployment/backend-deployment -n $NAMESPACE
+          kubectl rollout status deployment/frontend-deployment -n $NAMESPACE
