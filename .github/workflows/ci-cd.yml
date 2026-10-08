@@ -12,7 +12,7 @@ permissions:
 
 env:
   GAR_LOCATION: us-central1
-  REPO_NAME: secnotes-repo
+  REPO_NAME: repo
 
 jobs:
   # ========================================================
