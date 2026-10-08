@@ -62,14 +62,14 @@ router.post('/login', async(req,res) => {
     try{
         const {username, password} = req.body;
 
-        //#1: Buscar al usuario en la base de datos
-        const user = await User.findOne({username, password});
+        //FIX OWASP A02:2021: Buscar solamente por 'username'
+        const user = await User.findOne({username});
         if(!user){
             return res.status(401).json({error: 'Credenciales inválidas'});
         }
 
 
-        //Comparamos el teto plano ingresado en el front contra el hash almacenado
+        //Comparación segura en memoria contra el hash almacenado
         const textMatch = await bycrypt.compare(password, user.password);
         if(!textMatch){
             return res.status(401).json({message: 'Credenciales inválidas'});
