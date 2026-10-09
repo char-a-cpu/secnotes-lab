@@ -1,6 +1,6 @@
 import express from 'express';
 import Note from '../models/Note.js';
-import {encrypt, decrypted} from '../utils/crypto.js';
+import {encriptar, desencriptar} from '../utils/crypto.js';
 
 const router = express.Router();
 
@@ -19,7 +19,7 @@ router.get('/', async(req, res) => {
                 try{
                     return{
                         ...note,
-                        content: decrypt(note.content) //Descifra: 'iv:tag:cifrado' de vuelta a texto plano
+                        content: desencriptar(note.content) //Descifra: 'iv:tag:cifrado' de vuelta a texto plano
                     };
                 }catch(err){
                     //Si la clavecambió o el texto fue manipulado por la DB
@@ -55,7 +55,7 @@ router.post('/', async(req, res) => {
         //Si el usuario marcó la nota como privada, ciframos el contenido antes de guardarla en la DB
         let contenidoFinal = content;
         if(flagPrivada){
-            contenidoFinal = encrypt(content); //Convierte el texto plano en 'iv:tag:cifrado'
+            contenidoFinal = encriptar(content); //Convierte el texto plano en 'iv:tag:cifrado'
         }
 
         //Instancia del documento con los datos 
