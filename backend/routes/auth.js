@@ -1,6 +1,6 @@
 import express from 'express';
 import User from '../models/User.js';
-import bycrypt from 'bcryptjs';
+import bcrypt from 'bcryptjs';
 
 
 //Crea un mini-enrutador modular para agrupar todas las rutas relacionads con autenticación en un archivo separado
@@ -28,10 +28,10 @@ router.post('/register', async(req, res) => {
 
         //Solventar OWASP A02:2021 – Cryptographic Failures.
         //Generamos un salt con un factor de costo de 10 rondas
-        const salt = await bycrypt.genSalt(10);
+        const salt = await bcrypt.genSalt(10);
 
         //Generamos el hash seguro
-        const hashedPassword = await bycrypt.hash(password, salt);
+        const hashedPassword = await bcrypt.hash(password, salt);
 
         //Caso 3: Pasó validaciones de los casos 1 y 2. Crea usuario
         const newUser = new User({
@@ -70,7 +70,7 @@ router.post('/login', async(req,res) => {
 
 
         //Comparación segura en memoria contra el hash almacenado
-        const textMatch = await bycrypt.compare(password, user.password);
+        const textMatch = await bcrypt.compare(password, user.password);
         if(!textMatch){
             return res.status(401).json({message: 'Credenciales inválidas'});
         }
