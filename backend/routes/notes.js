@@ -1,6 +1,6 @@
 import express from 'express';
 import Note from '../models/Note.js';
-import {encrypt, decrypt} from '../utils/crypto.js';
+import {encrypt, decrypted} from '../utils/crypto.js';
 
 const router = express.Router();
 
